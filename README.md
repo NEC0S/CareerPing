@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/6f8e69df-291a-4f7d-aad5-268e1beb50ba
+
 <div align="center">
 
 # 📬 CareerPing
@@ -19,11 +23,11 @@ An open-source, self-hostable email agent that reads your career-related mail, d
 
 ## 🎥 Video Demo
 
-> Add your walkthrough here — this is the first thing visitors and reviewers will click.
+[![CareerPing demo video](docs/demo-thumbnail.png)](https://youtu.be/your-video-id)
 
 <div align="center">
 
-[![CareerPing demo video](docs/demo-thumbnail.png)](https://youtu.be/your-video-id)
+
 
 *Click the thumbnail to watch the 2-minute walkthrough: connecting an inbox, uploading a resume, and watching the agent triage real emails live.*
 
