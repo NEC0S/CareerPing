@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/6f8e69df-291a-4f7d-aad5-268e1beb50ba
-
 <div align="center">
 
 # 📬 CareerPing
@@ -23,7 +19,8 @@ An open-source, self-hostable email agent that reads your career-related mail, d
 
 ## 🎥 Video Demo
 
-[![CareerPing demo video](docs/demo-thumbnail.png)](https://youtu.be/your-video-id)
+
+https://github.com/user-attachments/assets/6f8e69df-291a-4f7d-aad5-268e1beb50ba
 
 <div align="center">
 
