@@ -1,0 +1,32 @@
+services:
+  app:
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./app/.env
+    volumes:
+      - career_sessions:/app/sessions
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: career_agent
+      POSTGRES_USER: career
+      POSTGRES_PASSWORD: change-me
+    volumes:
+      - career_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U career -d career_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  career_sessions:
+  career_db:
