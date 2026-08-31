@@ -68,8 +68,13 @@ load_dotenv(override=True)
 # Minimal production auth + database
 # ---------------------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./career_agent.db")
+# Render and other providers may supply either postgres:// or postgresql://.
+# The project uses psycopg (v3), so normalize PostgreSQL URLs explicitly
+# instead of letting SQLAlchemy fall back to the psycopg2 dialect.
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 Base = declarative_base()
 engine = create_engine(
     DATABASE_URL,
