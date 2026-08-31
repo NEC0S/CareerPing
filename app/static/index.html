@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Career Email Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B2B22;
+    --ink-2: #233327;
+    --ink-3: #30452F;
+    --paper: #F2ECD9;
+    --paper-2: #EAE1C4;
+    --paper-line: #D9CBA3;
+    --brass: #C99A3C;
+    --brass-dark: #A87D2A;
+    --rust: #A6432D;
+    --ink-text: #ECE6D5;
+    --ink-muted: #96A490;
+    --paper-text: #26241A;
+    --paper-muted: #6E664F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: var(--paper-text);
+    background: var(--paper);
+  }
+
+  h1, h2, .serif { font-family: 'Source Serif 4', serif; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- Left rail ---------- */
+  .rail {
+    background: var(--ink);
+    color: var(--ink-text);
+    padding: 36px 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .rail-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 0;
+    color: var(--ink-text);
+  }
+
+  .status-block { display: flex; flex-direction: column; gap: 6px; }
+
+  .status-row { display: flex; align-items: center; gap: 10px; }
+
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--ink-3);
+    flex-shrink: 0;
+  }
+  .status-dot.live { background: var(--brass); box-shadow: 0 0 0 4px rgba(201,154,60,0.18); }
+
+  .status-word { font-size: 30px; font-weight: 600; margin: 0; line-height: 1.1; }
+  .status-sub { font-size: 13px; color: var(--ink-muted); margin: 0; }
+
+  .rail hr { border: none; border-top: 1px solid var(--ink-3); margin: 0; }
+
+  .controls { display: flex; flex-direction: column; gap: 10px; }
+
+  button {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 11px 16px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform 0.06s ease, opacity 0.15s ease;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.55; cursor: default; transform: none; }
+
+  .btn-primary { background: var(--brass); color: var(--ink); border-color: var(--brass); }
+  .btn-primary:hover:not(:disabled) { background: var(--brass-dark); border-color: var(--brass-dark); }
+
+  .btn-outline { background: transparent; color: var(--ink-text); border-color: var(--ink-3); }
+  .btn-outline:hover:not(:disabled) { background: var(--ink-2); }
+
+  .btn-outline.active { background: var(--ink-3); }
+
+  .btn-text {
+    background: transparent; color: var(--ink-muted); border: none; padding: 4px 0;
+    font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px;
+  }
+  .btn-text:hover { color: var(--ink-text); }
+
+  /* switch */
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13.5px; color: var(--ink-text);
+  }
+  .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-track {
+    position: absolute; inset: 0; background: var(--ink-3); border-radius: 999px;
+    transition: background 0.15s ease;
+  }
+  .switch-track::before {
+    content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+    background: var(--ink-text); border-radius: 50%; transition: transform 0.15s ease;
+  }
+  .switch input:checked + .switch-track { background: var(--brass); }
+  .switch input:checked + .switch-track::before { transform: translateX(16px); background: var(--ink); }
+
+  .info-list { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: var(--ink-muted); }
+  .info-list .row { display: flex; justify-content: space-between; gap: 12px; }
+  .info-list .val { color: var(--ink-text); text-align: right; font-variant-numeric: tabular-nums; }
+  .info-list .warn { color: var(--rust); }
+
+  .error-note {
+    font-size: 12.5px; color: #E3B39F; background: rgba(166,67,45,0.18);
+    border-radius: 6px; padding: 8px 10px; line-height: 1.4;
+  }
+
+  /* ---------- Main content ---------- */
+  .main { padding: 44px 52px; }
+  .main-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 26px; }
+  .main-header h1 { font-size: 26px; font-weight: 600; margin: 0; }
+  .main-header .count { font-size: 13px; color: var(--paper-muted); }
+
+  .slips { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+
+  .slip {
+    background: var(--paper-2);
+    border-left: 4px solid var(--paper-line);
+    border-radius: 3px;
+    padding: 14px 18px;
+  }
+  .slip.type-replied { border-left-color: var(--brass); }
+  .slip.type-notified { border-left-color: var(--rust); }
+  .slip.type-skipped { border-left-color: var(--paper-line); }
+  .slip.type-error { border-left-color: var(--rust); }
+
+  .slip-top { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+  .slip-subject { font-family: 'Source Serif 4', serif; font-size: 16px; font-weight: 600; }
+  .slip-time { font-size: 12px; color: var(--paper-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .slip-sender { font-size: 12.5px; color: var(--paper-muted); margin-top: 2px; }
+  .slip-outcome { font-size: 13.5px; margin-top: 8px; line-height: 1.45; }
+  .slip-outcome.replied { color: var(--brass-dark); }
+  .slip-outcome.notified { color: var(--rust); }
+  .slip-outcome.skipped, .slip-outcome.error { color: var(--paper-muted); }
+
+  .slip details { margin-top: 8px; }
+  .slip summary { cursor: pointer; font-size: 12.5px; color: var(--paper-muted); }
+  .slip .reply-body {
+    margin-top: 8px; font-size: 13.5px; white-space: pre-wrap; line-height: 1.5;
+    background: var(--paper); padding: 12px 14px; border-radius: 4px;
+  }
+
+  .empty-state {
+    max-width: 460px; color: var(--paper-muted); font-size: 14.5px; line-height: 1.6;
+    padding: 40px 0;
+  }
+  .empty-state strong { color: var(--paper-text); }
+
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+    .main { padding: 32px 24px; }
+  }
+
+  /* ---------- Setup screen ---------- */
+  .setup-wrap {
+    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+    padding: 64px 24px;
+  }
+  .setup-card {
+    width: 100%; max-width: 520px; background: var(--paper-2);
+    border: 1px solid var(--paper-line); border-radius: 10px; padding: 36px 38px;
+  }
+  .setup-card h1 { font-size: 24px; margin: 0 0 6px; }
+  .setup-card .lede { color: var(--paper-muted); font-size: 14px; margin: 0 0 26px; line-height: 1.5; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label { font-size: 12.5px; font-weight: 600; color: var(--paper-muted); }
+  .field .hint { font-size: 11.5px; color: var(--paper-muted); font-weight: 400; }
+  .field input[type=text], .field input[type=email], .field input[type=password], .field textarea {
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; padding: 10px 12px;
+    border: 1px solid var(--paper-line); border-radius: 6px; background: var(--paper);
+    color: var(--paper-text);
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .advanced-toggle { font-size: 12.5px; color: var(--paper-muted); cursor: pointer; text-decoration: underline;
+    text-underline-offset: 2px; margin: 4px 0 14px; display: inline-block; }
+  .advanced-fields { display: none; }
+  .advanced-fields.open { display: block; }
+  .setup-actions { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .setup-error {
+    font-size: 13px; color: var(--rust); background: rgba(166,67,45,0.10);
+    border-radius: 6px; padding: 10px 12px; margin-bottom: 16px; line-height: 1.4;
+  }
+  .step-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--brass-dark); margin-bottom: 8px; }
+  .file-row { display: flex; align-items: center; gap: 10px; }
+  .file-row .file-status { font-size: 12.5px; color: var(--paper-muted); }
+  .setup-success { text-align: center; padding: 20px 0; }
+  .setup-success p { color: var(--paper-muted); font-size: 14px; }
+  .auth-tabs { display:flex; gap:8px; margin-bottom:20px; }
+  .auth-tab { flex:1; background:transparent; border:1px solid var(--paper-line); color:var(--paper-text); }
+  .auth-tab.active { background:var(--ink); color:var(--ink-text); border-color:var(--ink); }
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="setup-wrap" style="display:none;">
+  <div class="setup-card">
+    <div class="step-label">Career Email Agent</div>
+    <h1 class="serif" id="authTitle">Create your account</h1>
+    <p class="lede">Create a simple account so your resume, documents, inbox settings, and activity stay private to you.</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="signupTab">Sign up</button>
+      <button class="auth-tab" id="loginTab">Log in</button>
+    </div>
+    <div class="setup-error" id="authError" style="display:none;"></div>
+    <div class="field">
+      <label for="authEmail">Email address</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label for="authPassword">Password</label>
+      <input type="password" id="authPassword" placeholder="At least 8 characters" autocomplete="new-password" />
+    </div>
+    <div class="setup-actions">
+      <button class="btn-primary" id="authSubmitBtn">Create account</button>
+    </div>
+  </div>
+</div>
+
+<div id="setupScreen" class="setup-wrap" style="display:none;">
+  <div class="setup-card">
+    <div class="step-label" id="setupStep">Step 1 of 2</div>
+    <h1 class="serif" id="setupTitle">Connect your inbox</h1>
+    <p class="lede" id="setupLede">
+      Your email, app password, and (optionally) your own Gemini key stay on this
+      device via a cookie — nothing is baked into the server. Without your own
+      Gemini key, the agent falls back to a shared server key.
+    </p>
+
+    <div class="setup-error" id="setupError" style="display:none;"></div>
+
+    <div id="setupFormAccount">
+      <div class="field">
+        <label for="suEmail">Email address</label>
+        <input type="email" id="suEmail" placeholder="you@gmail.com" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="suPassword">App password</label>
+        <span class="hint">A Gmail/Outlook app password, not your normal login password.</span>
+        <input type="password" id="suPassword" placeholder="•••• •••• •••• ••••" autocomplete="current-password" />
+      </div>
+      <div class="field">
+        <label for="suName">Your name (optional)</label>
+        <span class="hint">Used in replies so the agent writes as you, e.g. "as Priya".</span>
+        <input type="text" id="suName" placeholder="Your name" />
+      </div>
+      <div class="field">
+        <label for="suGeminiKey">Your Gemini API key (optional)</label>
+        <span class="hint">Leave blank to use the Gemini key from the server .env file.</span>
+        <input type="password" id="suGeminiKey" placeholder="AIza..." autocomplete="off" />
+      </div>
+
+      <span class="advanced-toggle" id="advancedToggle">Advanced: server addresses &amp; push notifications</span>
+      <div class="advanced-fields" id="advancedFields">
+        <div class="field-row">
+          <div class="field">
+            <label for="suImap">IMAP server</label>
+            <input type="text" id="suImap" value="imap.gmail.com" />
+          </div>
+          <div class="field">
+            <label for="suSmtp">SMTP server</label>
+            <input type="text" id="suSmtp" value="smtp.gmail.com" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="suPushUser">Pushover user key</label>
+            <input type="text" id="suPushUser" placeholder="Optional" />
+          </div>
+          <div class="field">
+            <label for="suPushToken">Pushover app token</label>
+            <input type="text" id="suPushToken" placeholder="Optional" />
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="btn-primary" id="connectBtn">Connect inbox</button>
+      </div>
+    </div>
+
+    <div id="setupFormTwin" style="display:none;">
+      <div class="field">
+        <label for="suResume">Resume (PDF)</label>
+        <span class="hint">Used as context for replies, and can be auto-attached.</span>
+        <div class="file-row">
+          <input type="file" id="suResume" accept="application/pdf" />
+          <span class="file-status" id="resumeStatus"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="suSummary">About you</label>
+        <span class="hint">Describe yourself, your experience, interests, preferences, and anything the agent should know.</span>
+        <textarea id="suSummary" placeholder="Tell the agent about yourself..."></textarea>
+      </div>
+      <div class="field">
+        <label for="suSourceDocument">Additional document</label>
+        <span class="hint">Upload a PDF, DOCX, TXT, or MD file. The agent will extract its text and use it as context.</span>
+        <div class="file-row">
+          <input type="file" id="suSourceDocument" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" />
+          <span class="file-status" id="sourceDocumentStatus"></span>
+        </div>
+      </div>
+      <div class="setup-actions">
+        <button class="btn-primary" id="finishSetupBtn">Save profile and open dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="dashboardScreen" class="layout" style="display:none;">
+  <aside class="rail">
+    <h2 class="rail-title">Career Email Agent</h2>
+
+    <div class="status-block">
+      <div class="status-row">
+        <span class="status-dot" id="statusDot"></span>
+        <p class="status-word serif" id="statusWord">Loading…</p>
+      </div>
+      <p class="status-sub" id="statusSub"></p>
+    </div>
+
+    <hr />
+
+    <div class="controls">
+      <button class="btn-primary" id="runNowBtn">Check inbox now</button>
+      <button class="btn-outline" id="watchToggleBtn">Start watching</button>
+
+      <div class="switch-row" style="margin-top: 6px;">
+        <span>Send replies for real</span>
+        <label class="switch">
+          <input type="checkbox" id="liveModeInput" />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="info-list">
+      <div class="row"><span>Inbox</span><span class="val" id="infoEmail">—</span></div>
+      <div class="row"><span>Scanning</span><span class="val" id="infoDays">—</span></div>
+      <div class="row"><span>Resume</span><span class="val" id="infoResume">—</span></div>
+      <div class="row"><span>Summary</span><span class="val" id="infoSummary">—</span></div>
+      <div class="row"><span>Gemini key</span><span class="val" id="infoGeminiKey">—</span></div>
+      <div class="row"><span>Push alerts</span><span class="val" id="infoPushover">—</span></div>
+      <div class="row"><span>Emails processed</span><span class="val" id="infoHandled">—</span></div>
+      <div class="row"><span>Last checked</span><span class="val" id="infoLastRun">—</span></div>
+    </div>
+
+    <div class="error-note" id="errorNote" style="display:none;"></div>
+
+    <hr />
+    <button class="btn-text" id="changeAccountBtn" style="text-align:left;">Change email account</button>
+    <button class="btn-text" id="logoutBtn" style="text-align:left;">Log out</button>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h1 class="serif">Activity</h1>
+      <span class="count" id="activityCount"></span>
+    </div>
+    <div class="slips" id="slips"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <strong>No activity yet.</strong><br />
+      Click "Check inbox now" to scan for career-related emails, or turn on watching
+      to have it check automatically.
+    </div>
+  </main>
+</div>
+
+<script>
+  // ---------- Authentication ----------
+  const authScreen = document.getElementById('authScreen');
+  const signupTab = document.getElementById('signupTab');
+  const loginTab = document.getElementById('loginTab');
+  const authTitle = document.getElementById('authTitle');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authError = document.getElementById('authError');
+  let authMode = 'signup';
+
+  function showAuthError(msg) { authError.textContent = msg; authError.style.display = 'block'; }
+  function hideAuthError() { authError.style.display = 'none'; }
+  function setAuthMode(mode) {
+    authMode = mode; hideAuthError();
+    const signup = mode === 'signup';
+    signupTab.classList.toggle('active', signup); loginTab.classList.toggle('active', !signup);
+    authTitle.textContent = signup ? 'Create your account' : 'Welcome back';
+    authSubmitBtn.textContent = signup ? 'Create account' : 'Log in';
+    document.getElementById('authPassword').autocomplete = signup ? 'new-password' : 'current-password';
+  }
+  signupTab.addEventListener('click', () => setAuthMode('signup'));
+  loginTab.addEventListener('click', () => setAuthMode('login'));
+  authSubmitBtn.addEventListener('click', async () => {
+    hideAuthError();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!email || !password) return showAuthError('Email and password are required.');
+    authSubmitBtn.disabled = true; authSubmitBtn.textContent = authMode === 'signup' ? 'Creating…' : 'Logging in…';
+    try {
+      const res = await fetch(`/api/auth/${authMode}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Authentication failed.');
+      await refreshAll();
+    } catch (err) { showAuthError(err.message || 'Authentication failed.'); }
+    finally { authSubmitBtn.disabled = false; authSubmitBtn.textContent = authMode === 'signup' ? 'Create account' : 'Log in'; }
+  });
+
+  // ---------- Setup screen ----------
+  const setupScreen = document.getElementById('setupScreen');
+  const dashboardScreen = document.getElementById('dashboardScreen');
+  const setupError = document.getElementById('setupError');
+  const advancedToggle = document.getElementById('advancedToggle');
+  const advancedFields = document.getElementById('advancedFields');
+
+  advancedToggle.addEventListener('click', () => {
+    advancedFields.classList.toggle('open');
+  });
+
+  function showSetupError(msg) {
+    setupError.textContent = msg;
+    setupError.style.display = 'block';
+  }
+  function hideSetupError() {
+    setupError.style.display = 'none';
+  }
+
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    hideSetupError();
+    const email = document.getElementById('suEmail').value.trim();
+    const app_password = document.getElementById('suPassword').value;
+    if (!email || !app_password) {
+      showSetupError('Email and app password are both required.');
+      return;
+    }
+    const btn = document.getElementById('connectBtn');
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          app_password,
+          imap_server: document.getElementById('suImap').value.trim() || 'imap.gmail.com',
+          smtp_server: document.getElementById('suSmtp').value.trim() || 'smtp.gmail.com',
+          gemini_key: document.getElementById('suGeminiKey').value.trim() || null,
+          your_name: document.getElementById('suName').value.trim() || null,
+          pushover_user: document.getElementById('suPushUser').value.trim() || null,
+          pushover_token: document.getElementById('suPushToken').value.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showSetupError(data.error || 'Could not connect. Double-check your credentials.');
+        return;
+      }
+
+      // Profiles are remembered per inbox email. If this email already has a
+      // complete profile, do not ask the user to upload the same files again.
+      if (data.profile_complete) {
+        setupScreen.style.display = 'none';
+        dashboardScreen.style.display = 'grid';
+        await refreshAll();
+        return;
+      }
+
+      document.getElementById('setupFormAccount').style.display = 'none';
+      document.getElementById('setupFormTwin').style.display = 'block';
+      document.getElementById('setupStep').textContent = 'Step 2 of 2';
+      document.getElementById('setupTitle').textContent = 'Tell it about you';
+      document.getElementById('setupLede').textContent =
+        'Optional, but replies are only sent when the agent can answer confidently from what you give it here.';
+    } catch (err) {
+      showSetupError('Something went wrong reaching the server.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Connect inbox';
+    }
+  });
+
+  document.getElementById('suResume').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById('resumeStatus');
+    status.textContent = 'Uploading…';
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/setup/resume', { method: 'POST', body: form });
+    status.textContent = res.ok ? 'Uploaded ✓' : 'Upload failed';
+  });
+
+  document.getElementById('suSourceDocument').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById('sourceDocumentStatus');
+    status.textContent = 'Uploading and extracting text…';
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/setup/source-document', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        status.textContent = data.error || 'Upload failed';
+        return;
+      }
+      status.textContent = `Uploaded ✓ (${data.characters_extracted.toLocaleString()} characters extracted)`;
+    } catch (err) {
+      status.textContent = 'Upload failed';
+    }
+  });
+
+  async function finishSetup() {
+    hideSetupError();
+    const resume = document.getElementById('suResume').files[0];
+    const summary = document.getElementById('suSummary').value.trim();
+    const sourceDocument = document.getElementById('suSourceDocument').files[0];
+    if (!resume && document.getElementById('resumeStatus').dataset.existing !== '1') {
+      showSetupError('Please upload your resume.');
+      return;
+    }
+    if (!summary) {
+      showSetupError('Please describe yourself so the agent knows how to write as you.');
+      return;
+    }
+    if (!sourceDocument && document.getElementById('sourceDocumentStatus').dataset.existing !== '1') {
+      showSetupError('Please upload an additional document for the agent to extract text from.');
+      return;
+    }
+
+    const btn = document.getElementById('finishSetupBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const summaryRes = await fetch('/api/setup/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: summary }),
+      });
+      if (!summaryRes.ok) {
+        const data = await summaryRes.json();
+        throw new Error(data.error || 'Could not save your description.');
+      }
+      setupScreen.style.display = 'none';
+      dashboardScreen.style.display = 'grid';
+      refreshAll();
+    } catch (err) {
+      showSetupError(err.message || 'Could not save your profile.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save profile and open dashboard';
+    }
+  }
+
+  document.getElementById('finishSetupBtn').addEventListener('click', finishSetup);
+
+  document.getElementById('changeAccountBtn').addEventListener('click', async () => {
+    if (!confirm('This disconnects your inbox from this browser and clears its history here. Continue?')) return;
+    await fetch('/api/change-account', { method: 'POST' });
+    location.reload();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method:'POST' });
+    location.reload();
+  });
+
+  // ---------- Dashboard ----------
+  const runNowBtn = document.getElementById('runNowBtn');
+  const watchToggleBtn = document.getElementById('watchToggleBtn');
+  const liveModeInput = document.getElementById('liveModeInput');
+
+  function relativeTime(iso) {
+    if (!iso) return '—';
+    const then = new Date(iso);
+    const diffSec = Math.round((Date.now() - then.getTime()) / 1000);
+    if (diffSec < 45) return 'Just now';
+    if (diffSec < 3600) return Math.round(diffSec / 60) + 'm ago';
+    if (diffSec < 86400) return Math.round(diffSec / 3600) + 'h ago';
+    return then.toLocaleDateString() + ' ' + then.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  }
+
+  async function refreshStatus() {
+    const res = await fetch('/api/status');
+    const s = await res.json();
+
+    if (s.authenticated === false) {
+      dashboardScreen.style.display = 'none';
+      setupScreen.style.display = 'none';
+      authScreen.style.display = 'flex';
+      return false;
+    }
+
+    authScreen.style.display = 'none';
+    if (!s.configured) {
+      dashboardScreen.style.display = 'none';
+      setupScreen.style.display = 'flex';
+      document.getElementById('setupFormAccount').style.display = 'block';
+      document.getElementById('setupFormTwin').style.display = 'none';
+      document.getElementById('setupStep').textContent = 'Step 1 of 2';
+      document.getElementById('setupTitle').textContent = 'Connect your inbox';
+      return false;
+    }
+
+    // Account is connected but the personal context is incomplete.
+    // Keep the user on the profile page instead of silently opening the dashboard.
+    if (!s.profile_complete) {
+      dashboardScreen.style.display = 'none';
+      setupScreen.style.display = 'flex';
+      document.getElementById('setupFormAccount').style.display = 'none';
+      document.getElementById('setupFormTwin').style.display = 'block';
+      document.getElementById('setupStep').textContent = 'Step 2 of 2';
+      document.getElementById('setupTitle').textContent = 'Build your profile';
+      document.getElementById('setupLede').textContent =
+        'Upload your resume, describe yourself, and add one supporting document. Existing files for this inbox are kept, so you only need to replace anything that changed.';
+      const resumeStatus = document.getElementById('resumeStatus');
+      const sourceStatus = document.getElementById('sourceDocumentStatus');
+      resumeStatus.dataset.existing = s.resume_found ? '1' : '0';
+      sourceStatus.dataset.existing = s.source_document_found ? '1' : '0';
+      resumeStatus.textContent = s.resume_found ? 'Already saved ✓' : '';
+      sourceStatus.textContent = s.source_document_found ? 'Already saved ✓' : '';
+      const summary = document.getElementById('suSummary');
+      if (s.summary_text && !summary.value) summary.value = s.summary_text;
+      return false;
+    }
+
+    setupScreen.style.display = 'none';
+    dashboardScreen.style.display = 'grid';
+
+    const dot = document.getElementById('statusDot');
+    const word = document.getElementById('statusWord');
+    const sub = document.getElementById('statusSub');
+
+    if (s.polling) {
+      dot.classList.add('live');
+      word.textContent = 'Watching';
+      sub.textContent = `Checking every ${Math.round(s.poll_interval / 60) || 1} min`;
+      watchToggleBtn.textContent = 'Stop watching';
+      watchToggleBtn.classList.add('active');
+    } else {
+      dot.classList.remove('live');
+      word.textContent = 'Paused';
+      sub.textContent = 'Not checking your inbox automatically';
+      watchToggleBtn.textContent = 'Start watching';
+      watchToggleBtn.classList.remove('active');
+    }
+
+    liveModeInput.checked = !s.dry_run;
+
+    document.getElementById('infoEmail').textContent = s.email_address || 'Not configured';
+    document.getElementById('infoDays').textContent = `Last ${s.days_to_scan} day(s)`;
+    document.getElementById('infoResume').textContent = s.resume_found ? 'Found' : 'Missing';
+    document.getElementById('infoResume').classList.toggle('warn', !s.resume_found);
+    document.getElementById('infoSummary').textContent = s.summary_found ? 'Found' : 'Missing';
+    document.getElementById('infoSummary').classList.toggle('warn', !s.summary_found);
+    document.getElementById('infoGeminiKey').textContent = s.using_own_gemini_key ? 'Yours' : (s.gemini_key_found ? 'Shared fallback' : 'Missing');
+    document.getElementById('infoGeminiKey').classList.toggle('warn', !s.gemini_key_found);
+    document.getElementById('infoPushover').textContent = s.pushover_configured ? 'On' : 'Off';
+    document.getElementById('infoHandled').textContent = s.handled_count;
+    document.getElementById('infoLastRun').textContent = relativeTime(s.last_run_at);
+
+    const errorNote = document.getElementById('errorNote');
+    if (s.last_error) {
+      errorNote.style.display = 'block';
+      errorNote.textContent = 'Last check failed: ' + s.last_error;
+    } else {
+      errorNote.style.display = 'none';
+    }
+    return true;
+  }
+
+  function outcomeLine(entry) {
+    switch (entry.type) {
+      case 'replied':
+        return entry.dry_run ? 'Would have replied automatically (dry run — nothing sent)' : 'Replied automatically';
+      case 'notified':
+        return 'Flagged for you — ' + entry.detail;
+      case 'skipped':
+        return 'Skipped — ' + entry.detail;
+      case 'error':
+        return 'Error — ' + entry.detail;
+      default:
+        return entry.detail || '';
+    }
+  }
+
+  async function refreshLogs() {
+    const res = await fetch('/api/logs?limit=50');
+    const logs = await res.json();
+
+    const container = document.getElementById('slips');
+    const empty = document.getElementById('emptyState');
+    document.getElementById('activityCount').textContent = logs.length ? `${logs.length} recent` : '';
+
+    if (!logs.length) {
+      container.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    container.innerHTML = logs.map(entry => {
+      const subject = entry.subject || '(no subject)';
+      const sender = entry.sender || '';
+      const replyBlock = (entry.type === 'replied' && entry.detail)
+        ? `<details><summary>Show reply</summary><div class="reply-body">${escapeHtml(entry.detail)}</div></details>`
+        : '';
+      return `
+        <div class="slip type-${entry.type}">
+          <div class="slip-top">
+            <span class="slip-subject">${escapeHtml(subject)}</span>
+            <span class="slip-time">${relativeTime(entry.timestamp)}</span>
+          </div>
+          <div class="slip-sender">${escapeHtml(sender)}</div>
+          <div class="slip-outcome ${entry.type}">${escapeHtml(outcomeLine(entry))}</div>
+          ${replyBlock}
+        </div>`;
+    }).join('');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  async function refreshAll() {
+    const configured = await refreshStatus();
+    if (configured) await refreshLogs();
+  }
+
+  runNowBtn.addEventListener('click', async () => {
+    runNowBtn.disabled = true;
+    runNowBtn.textContent = 'Checking…';
+    try {
+      await fetch('/api/run-once', { method: 'POST' });
+      await refreshAll();
+    } finally {
+      runNowBtn.disabled = false;
+      runNowBtn.textContent = 'Check inbox now';
+    }
+  });
+
+  watchToggleBtn.addEventListener('click', async () => {
+    const currentlyWatching = watchToggleBtn.classList.contains('active');
+    watchToggleBtn.disabled = true;
+    await fetch(`/api/polling/${currentlyWatching ? 'stop' : 'start'}`, { method: 'POST' });
+    watchToggleBtn.disabled = false;
+    await refreshStatus();
+  });
+
+  liveModeInput.addEventListener('change', async () => {
+    await fetch('/api/dry-run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !liveModeInput.checked }),
+    });
+    await refreshStatus();
+  });
+
+  refreshAll();
+  setInterval(refreshAll, 8000);
+</script>
+
+</body>
+</html>

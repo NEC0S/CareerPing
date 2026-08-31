@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+python-multipart
+openai
+pypdf
+requests
+python-docx
+sqlalchemy
+psycopg[binary]
+cryptography
