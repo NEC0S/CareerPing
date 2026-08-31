@@ -1,7 +1,0 @@
-.env
-app/.env
-__pycache__/
-*.pyc
-app/career_agent.db
-app/sessions/
-*.log

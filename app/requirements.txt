@@ -9,3 +9,4 @@ python-docx
 sqlalchemy
 psycopg[binary]
 cryptography
+supabase

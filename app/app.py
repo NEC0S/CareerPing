@@ -40,6 +40,8 @@ import threading
 import time
 import base64
 import hmac
+import tempfile
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from email import policy
@@ -62,25 +64,31 @@ from pypdf import PdfReader
 from docx import Document
 from starlette.concurrency import run_in_threadpool
 
+try:
+    from supabase import create_client
+except ImportError:
+    create_client = None
+
 load_dotenv(override=True)
 
 # ---------------------------------------------------------------------------
 # Minimal production auth + database
 # ---------------------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./career_agent.db")
-# Render and other providers may supply either postgres:// or postgresql://.
-# The project uses psycopg (v3), so normalize PostgreSQL URLs explicitly
-# instead of letting SQLAlchemy fall back to the psycopg2 dialect.
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 Base = declarative_base()
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-    pool_pre_ping=True,
-)
+engine_kwargs = {
+    "pool_pre_ping": True,
+}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Keep the free-tier Supabase Postgres connection footprint small.
+    engine_kwargs.update({"pool_size": 2, "max_overflow": 1})
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 class User(Base):
@@ -111,6 +119,116 @@ else:
     # Local development fallback. Production deployments MUST set ENCRYPTION_KEY.
     FERNET = Fernet(Fernet.generate_key())
     print("WARNING: ENCRYPTION_KEY is not set; encrypted credentials will not survive process restarts.")
+
+# ---------------------------------------------------------------------------
+# Supabase Storage persistence (used in free Render deployments)
+# ---------------------------------------------------------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "career-files").strip() or "career-files"
+SUPABASE_ENABLED = bool(SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)
+SUPABASE = None
+
+if SUPABASE_ENABLED:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set when using Supabase Storage.")
+    if create_client is None:
+        raise RuntimeError("The 'supabase' package is required when Supabase Storage is enabled.")
+    try:
+        SUPABASE = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        buckets = SUPABASE.storage.list_buckets()
+        bucket_ids = {getattr(bucket, "id", None) or bucket.get("id") for bucket in buckets}
+        if SUPABASE_STORAGE_BUCKET not in bucket_ids:
+            SUPABASE.storage.create_bucket(
+                SUPABASE_STORAGE_BUCKET,
+                options={"public": False, "file_size_limit": 16 * 1024 * 1024},
+            )
+    except Exception as exc:
+        raise RuntimeError(f"Could not initialize Supabase Storage: {exc}") from exc
+
+_storage_locks: dict[str, threading.Lock] = {}
+_storage_locks_guard = threading.Lock()
+_hydrated_sessions: set[str] = set()
+
+def _storage_lock(sid: str) -> threading.Lock:
+    with _storage_locks_guard:
+        return _storage_locks.setdefault(sid, threading.Lock())
+
+def _storage_object_path(sid: str) -> str:
+    return f"sessions/{sid}.zip"
+
+def _zip_session(sid: str) -> str:
+    """Create a zip containing the active session and email-profile archive."""
+    tmp = tempfile.NamedTemporaryFile(prefix=f"career-{sid}-", suffix=".zip", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        roots = [session_dir(sid), profile_archive_dir(sid)]
+        for root in roots:
+            if not root.exists():
+                continue
+            base = root.name
+            if root.is_file():
+                zf.write(root, base)
+                continue
+            for file_path in root.rglob("*"):
+                if file_path.is_file():
+                    arcname = str(Path(base) / file_path.relative_to(root)).replace("\\", "/")
+                    zf.write(file_path, arcname)
+    return tmp_path
+
+def hydrate_session(sid: str) -> None:
+    """Restore a user's persistent files from Supabase once per process."""
+    session_dir(sid).mkdir(parents=True, exist_ok=True)
+    profile_archive_dir(sid).mkdir(parents=True, exist_ok=True)
+    if not SUPABASE_ENABLED:
+        return
+    with _storage_lock(sid):
+        if sid in _hydrated_sessions:
+            return
+        try:
+            data = SUPABASE.storage.from_(SUPABASE_STORAGE_BUCKET).download(_storage_object_path(sid))
+        except Exception as exc:
+            # A missing object is normal for a brand-new account. Other storage
+            # errors should surface rather than silently losing the user's data.
+            message = str(exc).lower()
+            if "not found" not in message and "404" not in message and "object not found" not in message:
+                raise RuntimeError(f"Could not restore persistent session data: {exc}") from exc
+            data = None
+
+        if data:
+            # Only hydrate into the local cache after a successful download.
+            with tempfile.NamedTemporaryFile(prefix="career-restore-", suffix=".zip", delete=False) as tmp:
+                tmp.write(data)
+                zip_path = tmp.name
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    for member in zf.infolist():
+                        target = (SESSIONS_DIR / member.filename).resolve()
+                        sessions_root = SESSIONS_DIR.resolve()
+                        if not str(target).startswith(str(sessions_root) + os.sep):
+                            raise RuntimeError("Unsafe persistent-session archive entry detected.")
+                    zf.extractall(SESSIONS_DIR)
+            finally:
+                Path(zip_path).unlink(missing_ok=True)
+        _hydrated_sessions.add(sid)
+
+def persist_session(sid: str) -> None:
+    """Upload the current local session cache to private Supabase Storage."""
+    if not SUPABASE_ENABLED:
+        return
+    with _storage_lock(sid):
+        zip_path = _zip_session(sid)
+        try:
+            with open(zip_path, "rb") as f:
+                SUPABASE.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                    _storage_object_path(sid),
+                    f,
+                    file_options={"upsert": "true", "content-type": "application/zip"},
+                )
+        finally:
+            Path(zip_path).unlink(missing_ok=True)
+
 
 def hash_password(password: str, salt: bytes | None = None) -> str:
     salt = salt or secrets.token_bytes(16)
@@ -163,6 +281,7 @@ def require_user(request: Request, response: Response) -> tuple[User, str] | JSO
     # The authenticated database user ID is the only valid storage namespace.
     # Never trust a client-controlled session cookie to select another user's files.
     sid = user.id
+    hydrate_session(sid)
     response.set_cookie(
         COOKIE_NAME,
         sid,
@@ -328,6 +447,7 @@ def save_config(sid: str, cfg: dict) -> None:
         if safe_cfg.get(key):
             safe_cfg[key] = encrypt_secret(safe_cfg[key])
     config_path(sid).write_text(json.dumps(safe_cfg, indent=2))
+    persist_session(sid)
 
 
 # ---------------------------------------------------------------------------
@@ -492,6 +612,7 @@ def log_event(sid: str, **entry):
     rt.logs.append(entry)
     del rt.logs[: -MAX_LOG_ENTRIES]
     log_file(sid).write_text(json.dumps(rt.logs[-MAX_LOG_ENTRIES:], indent=2))
+    persist_session(sid)
 
 
 # ---------------------------------------------------------------------------
@@ -525,6 +646,7 @@ def load_handled_ids(sid: str) -> set:
 
 def save_handled_ids(sid: str, ids: set) -> None:
     state_file(sid).write_text(json.dumps(sorted(ids)))
+    persist_session(sid)
 
 
 def push(sid: str, cfg: dict, rt: SessionRuntime, message: str):
@@ -903,6 +1025,7 @@ def setup(body: SetupBody, request: Request, response: Response):
     save_config(sid, cfg)
     invalidate_twin_cache(sid)
 
+    persist_session(sid)
     profile_complete = (
         resume_path(sid).exists()
         and summary_path(sid).exists()
@@ -921,6 +1044,7 @@ async def upload_resume(request: Request, response: Response, file: UploadFile =
         return JSONResponse({"ok": False, "error": "Set up your account before uploading a resume."}, status_code=400)
     twin_dir(sid).mkdir(parents=True, exist_ok=True)
     resume_path(sid).write_bytes(await file.read())
+    persist_session(sid)
     invalidate_twin_cache(sid)
     return {"ok": True}
 
@@ -934,6 +1058,7 @@ def upload_summary(body: SummaryBody, request: Request, response: Response):
         return JSONResponse({"ok": False, "error": "Set up your account before adding a summary."}, status_code=400)
     twin_dir(sid).mkdir(parents=True, exist_ok=True)
     summary_path(sid).write_text(body.text, encoding="utf-8")
+    persist_session(sid)
     invalidate_twin_cache(sid)
     return {"ok": True}
 
@@ -971,6 +1096,7 @@ async def upload_source_document(request: Request, response: Response, file: Upl
         return JSONResponse({"ok": False, "error": f"Could not extract text: {exc}"}, status_code=400)
 
     source_document_text_path(sid).write_text(extracted, encoding="utf-8")
+    persist_session(sid)
     invalidate_twin_cache(sid)
     return {"ok": True, "filename": file.filename, "characters_extracted": len(extracted)}
 
@@ -1007,6 +1133,7 @@ def change_account(request: Request, response: Response):
     shutil.rmtree(session_dir(sid), ignore_errors=True)
     session_dir(sid).mkdir(parents=True, exist_ok=True)
     profile_archive_dir(sid).mkdir(parents=True, exist_ok=True)
+    persist_session(sid)
     with _registry_lock:
         RUNTIME.pop(sid, None)
 
@@ -1119,7 +1246,7 @@ def get_logs(request: Request, response: Response, limit: int = 50):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "database": "configured", "persistent_storage": "supabase" if SUPABASE_ENABLED else "local"}
 
 
 # Serve the dashboard. Registered last so it doesn't shadow the /api routes above.
