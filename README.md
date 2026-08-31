@@ -22,23 +22,6 @@ An open-source, self-hostable email agent that reads your career-related mail, d
 
 https://github.com/user-attachments/assets/6f8e69df-291a-4f7d-aad5-268e1beb50ba
 
-<div align="center">
-
-
-
-*Click the thumbnail to watch the 2-minute walkthrough: connecting an inbox, uploading a resume, and watching the agent triage real emails live.*
-
-</div>
-
-<details>
-<summary>How to add your own demo (click to expand)</summary>
-
-1. Record a short screen capture (60–120s is plenty): connect an inbox → upload a resume → click **Check inbox now** → show the activity log deciding reply / flag / skip → open a generated reply.
-2. Upload it to YouTube (unlisted is fine), Loom, or as a GitHub-hosted MP4/GIF.
-3. Replace `https://youtu.be/your-video-id` above with your link, and drop a thumbnail image at `docs/demo-thumbnail.png`.
-4. If you'd rather embed directly without leaving GitHub, drag an `.mp4` or `.gif` into a GitHub issue/PR comment first to get a CDN URL, then reference it here — GitHub renders video files inline in README.md.
-
-</details>
 
 ---
 
