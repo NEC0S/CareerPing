@@ -17,6 +17,18 @@ An open-source, self-hostable email agent that reads your career-related mail, d
 
 ---
 
+<a href="https://careerping.onrender.com/">
+  <img src="https://img.shields.io/badge/🌐%20Open%20Live%20Website-000000?style=for-the-badge" />
+</a>
+
+&nbsp;
+
+<a href="https://github.com/NEC0S/CareerPing">
+  <img src="https://img.shields.io/badge/💻%20View%20Source%20Code-333333?style=for-the-badge&logo=github" />
+</a>
+
+---
+
 ## 🎥 Video Demo
 
 
